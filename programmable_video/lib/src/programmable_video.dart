@@ -195,19 +195,16 @@ class TwilioProgrammableVideo {
   /// Throws [InitializationException] if an error is caught when attempting to connect.
   /// Throws [ActiveCallException] if it fails to get AudioFocus on Android, or activate its AVAudioSession on iOS.
   static Future<Room> connect(ConnectOptions connectOptions) async {
-    if (await requestPermissionForCameraAndMicrophone()) {
-      try {
-        final roomId = await ProgrammableVideoPlatform.instance.connectToRoom(connectOptions.toModel());
-        if (roomId == null) {
-          throw Exception('RoomId is null');
-        }
-
-        return Room(roomId);
-      } on PlatformException catch (err) {
-        throw TwilioProgrammableVideo._convertException(err);
+    try {
+      final roomId = await ProgrammableVideoPlatform.instance.connectToRoom(connectOptions.toModel());
+      if (roomId == null) {
+        throw Exception('RoomId is null');
       }
+
+      return Room(roomId);
+    } on PlatformException catch (err) {
+      throw TwilioProgrammableVideo._convertException(err);
     }
-    throw Exception('Permissions not granted');
   }
 
   static Future<List<StatsReport>?> getStats() async {
