@@ -4,6 +4,8 @@ import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
@@ -423,7 +425,10 @@ class PluginHandler : MethodCallHandler, ActivityAware, BaseListener {
     }
 
     private fun setSpeakerPhoneOnInternal() {
-        val bluetoothProfileConnectionState = BluetoothAdapter.getDefaultAdapter().getProfileConnectionState(BluetoothProfile.HEADSET)
+        var bluetoothProfileConnectionState = BluetoothProfile.STATE_DISCONNECTED
+        if (hasBluetoothPermissions()) {
+            bluetoothProfileConnectionState = BluetoothAdapter.getDefaultAdapter().getProfileConnectionState(BluetoothProfile.HEADSET)
+        }
         debug("setSpeakerPhoneOnInternal => on: ${audioSettings.speakerEnabled}\n bluetoothEnable: ${audioSettings.bluetoothPreferred}\n bluetoothScoOn: ${audioManager.isBluetoothScoOn}\n bluetoothProfileConnectionState: $bluetoothProfileConnectionState")
 
         // Even if already enabled, setting `audioManager.isSpeakerphoneOn` to true
@@ -438,6 +443,18 @@ class PluginHandler : MethodCallHandler, ActivityAware, BaseListener {
                 bluetoothProfileConnectionState != BluetoothProfile.STATE_CONNECTED) {
             applySpeakerPhoneSettings()
         }
+    }
+
+    private fun hasBluetoothPermissions(): Boolean {
+        // Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return ContextCompat.checkSelfPermission(
+                applicationContext,
+                android.Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+
+        return true
     }
 
     internal fun applySpeakerPhoneSettings() {
