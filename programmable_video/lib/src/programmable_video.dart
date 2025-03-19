@@ -158,28 +158,27 @@ class TwilioProgrammableVideo {
     return await ProgrammableVideoPlatform.instance.deviceHasReceiver();
   }
 
-  /// Request permission for camera and microphone.
+  /// Request permission for microphone.
   ///
   /// Uses the PermissionHandler plugin. Returns the granted result.
-  static Future<bool> requestPermissionForCameraAndMicrophone() async {
+  static Future<bool> requestPermissionForMicrophone() async {
     if (kIsWeb) {
       return true;
     }
 
-    await [Permission.camera, Permission.microphone].request();
+    await Permission.microphone.request();
     final micPermission = await Permission.microphone.status;
-    final camPermission = await Permission.camera.status;
-    _log('Permissions => Microphone: $micPermission, Camera: $camPermission');
+    _log('Permissions => Microphone: $micPermission');
 
-    if (micPermission == PermissionStatus.granted && camPermission == PermissionStatus.granted) {
+    if (micPermission == PermissionStatus.granted) {
       return true;
     }
 
-    if (micPermission == PermissionStatus.denied || camPermission == PermissionStatus.denied) {
-      return requestPermissionForCameraAndMicrophone();
+    if (micPermission == PermissionStatus.denied) {
+      return requestPermissionForMicrophone();
     }
 
-    if (micPermission == PermissionStatus.permanentlyDenied || camPermission == PermissionStatus.permanentlyDenied) {
+    if (micPermission == PermissionStatus.permanentlyDenied) {
       _log('Permissions => Opening App Settings');
       await openAppSettings();
     }
@@ -187,14 +186,62 @@ class TwilioProgrammableVideo {
     return false;
   }
 
+  /// Request permission for camera.
+  ///
+  /// Uses the PermissionHandler plugin. Returns the granted result.
+  static Future<bool> requestPermissionForCamera() async {
+    if (kIsWeb) {
+      return true;
+    }
+
+    await Permission.camera.request();
+    final camPermission = await Permission.camera.status;
+    _log('Permissions => Camera: $camPermission');
+
+    if (camPermission == PermissionStatus.granted) {
+      return true;
+    }
+
+    if (camPermission == PermissionStatus.denied) {
+      return requestPermissionForCamera();
+    }
+
+    if (camPermission == PermissionStatus.permanentlyDenied) {
+      _log('Permissions => Opening App Settings');
+      await openAppSettings();
+    }
+
+    return false;
+  }
+
+  /// Request permission for camera and microphone.
+  ///
+  /// Uses the PermissionHandler plugin. Returns the granted result.
+  static Future<bool> requestPermissionForCameraAndMicrophone() async {
+    final micPermission = await requestPermissionForMicrophone();
+    final camPermission = await requestPermissionForCamera();
+    return micPermission && camPermission;
+  }
+
   /// Connect to a [Room].
   ///
-  /// Will request camera and microphone permissions.
+  /// Will request necessary permissions based on the tracks being used.
   /// Throws [MissingParameterException] if [ConnectOptions] are not provided.
   /// Throws [MissingCameraException] if no camera is found for the specified [CameraSource].
   /// Throws [InitializationException] if an error is caught when attempting to connect.
   /// Throws [ActiveCallException] if it fails to get AudioFocus on Android, or activate its AVAudioSession on iOS.
   static Future<Room> connect(ConnectOptions connectOptions) async {
+    final hasAudioTracks = connectOptions.audioTracks?.isNotEmpty ?? false;
+    final hasVideoTracks = connectOptions.videoTracks?.isNotEmpty ?? false;
+
+    if (hasAudioTracks && !await requestPermissionForMicrophone()) {
+      throw Exception('Microphone permission not granted');
+    }
+
+    if (hasVideoTracks && !await requestPermissionForCamera()) {
+      throw Exception('Camera permission not granted');
+    }
+
     try {
       final roomId = await ProgrammableVideoPlatform.instance.connectToRoom(connectOptions.toModel());
       if (roomId == null) {
